@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Microsoft Cognitive Services Speech SDK JavaScript Quickstart</title>
+  <meta charset="utf-8" />
+<script>
+  // Note: Replace the URL with a valid endpoint to retrieve
+  //       authorization tokens for your subscription.
+ 
+	function sentimentAnalysis(){
+		const { TextAnalyticsClient, TextAnalyticsApiKeyCredential } = require("@azure/ai-text-analytics");
+
+		const key = '8fe4ff90e44d4e65a8f2836000aff137';
+		const endpoint = 'https://s2tanalytics.cognitiveservices.azure.com/';
+
+		const textAnalyticsClient = new TextAnalyticsClient(endpoint,  new TextAnalyticsApiKeyCredential(key));
+		alert('test the sentiment');
+	   // const sentimentInput = ["I had the best day of my life. I wish you were there with me." ];
+		//const sentimentInput = result.text;
+		const sentimentResult = await textAnalyticsClient.analyzeSentiment(sentimentInput);
+		sentDiv.innerHTML = sentimentResult;
+
+		sentimentResult.forEach(document => {
+			console.log(`ID: ${document.id}`);
+			console.log(`\tDocument Sentiment: ${document.sentiment}`);
+			console.log(`\tDocument Scores:`);
+			console.log(`\t\tPositive: ${document.confidenceScores.positive.toFixed(2)} \tNegative: ${document.confidenceScores.negative.toFixed(2)} \tNeutral: ${document.confidenceScores.neutral.toFixed(2)}`);
+			console.log(`\tSentences Sentiment(${document.sentences.length}):`);
+			document.sentences.forEach(sentence => {
+				console.log(`\t\tSentence sentiment: ${sentence.sentiment}`)
+				console.log(`\t\tSentences Scores:`);
+				console.log(`\t\tPositive: ${sentence.confidenceScores.positive.toFixed(2)} \tNegative: ${sentence.confidenceScores.negative.toFixed(2)} \tNeutral: ${sentence.confidenceScores.neutral.toFixed(2)}`);
+			});
+		});
+}
+</script>
+</head>
+<body style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:13px;">
+  
+  <!-- <uidiv> -->
+  <div id="warning">
+    <h1 style="font-weight:500;">Speech Recognition Speech SDK not found (microsoft.cognitiveservices.speech.sdk.bundle.js missing).</h1>
+  </div>
+  
+  <div id="content" style="display:none">
+    <table width="100%">
+      <tr>
+        <td></td>
+        <td><h1 style="font-weight:500;">Microsoft Cognitive Services Speech</h1></td>
+      </tr>
+      <tr>
+        <td align="right"><a href="https://docs.microsoft.com/azure/cognitive-services/speech-service/get-started" target="_blank">Subscription</a>:</td>
+        <td><input id="subscriptionKey" type="text" size="40" placeholder="subscription key"></td>
+      </tr>
+      <tr>
+        <td align="right">Region</td>
+        <td><input id="serviceRegion" type="text" size="40" placeholder="your region"></td>
+      </tr>
+      <tr>
+        <td></td>
+        <td><button id="startRecognizeOnceAsyncButton">Start recognition</button></td>
+      </tr>
+      <tr>
+        <td align="right" valign="top">Results</td>
+        <td><textarea id="phraseDiv" style="display: inline-block;width:500px;height:100px"></textarea></td>
+      </tr>
+      <tr>
+        <td></td>
+        <td><h1 style="font-weight:500;">Microsoft Cognitive Services Text Analytics</h1></td>
+      </tr>
+      <tr>
+        <td align="right"><a href="https://docs.microsoft.com/en-us/azure/cognitive-services/text-analytics/quickstarts/go-sdk" target="_blank">Subscription</a>:</td>
+        <td><input id="txtsubscriptionKey" type="text" size="40" placeholder="subscription key"></td>
+      </tr>
+      <tr>
+        <td align="right">Service End Point</td>
+        <td><input id="txtendpoint" type="text" size="40" placeholder="endpoint"></td>
+      </tr>
+      <tr>
+        <td></td>
+        <td><button id="starttxtanalytics">Get Sentiment</button></td>
+      </tr>	  
+	  <tr>
+        <td align="right" valign="top">Sentiment Score</td>
+        <td><textarea id="sentDiv" style="display: inline-block;width:500px;height:100px"></textarea></td>
+      </tr>
+    </table>
+  </div>
+  <!-- </uidiv> -->
+
+  <!-- <speechsdkref> -->
+  <!-- Speech SDK reference sdk. -->
+  <script src="microsoft.cognitiveservices.speech.sdk.bundle.js"></script>
+  <!-- </speechsdkref> -->
+
+  <!-- <authorizationfunction> -->
+  <!-- Speech SDK Authorization token -->
+  <script>
+  // Note: Replace the URL with a valid endpoint to retrieve
+  //       authorization tokens for your subscription.
+  var authorizationEndpoint = "token.php";
+
+  function RequestAuthorizationToken() {
+    if (authorizationEndpoint) {
+      var a = new XMLHttpRequest();
+      a.open("GET", authorizationEndpoint);
+      a.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+      a.send("");
+      a.onload = function() {
+          var token = JSON.parse(atob(this.responseText.split(".")[1]));
+          serviceRegion.value = token.region;
+          authorizationToken = this.responseText;
+          subscriptionKey.disabled = true;
+          subscriptionKey.value = "using authorization token (hit F5 to refresh)";
+          console.log("Got an authorization token: " + token);
+      }
+    }
+  }
+  </script>
+  <!-- </authorizationfunction> -->
+
+  <!-- <quickstartcode> -->
+  <!-- Speech SDK USAGE -->
+  <script>
+    // status fields and start button in UI
+    var phraseDiv;
+    var startRecognizeOnceAsyncButton;
+
+    // subscription key and region for speech services.
+    var subscriptionKey, serviceRegion;
+    var authorizationToken;
+    var SpeechSDK;
+    var recognizer;
+
+    document.addEventListener("DOMContentLoaded", function () {
+      startRecognizeOnceAsyncButton = document.getElementById("startRecognizeOnceAsyncButton");
+      subscriptionKey = document.getElementById("subscriptionKey");
+      serviceRegion = document.getElementById("serviceRegion");
+      phraseDiv = document.getElementById("phraseDiv");
+
+      startRecognizeOnceAsyncButton.addEventListener("click", function () {
+        startRecognizeOnceAsyncButton.disabled = true;
+        phraseDiv.innerHTML = "";
+
+        // if we got an authorization token, use the token. Otherwise use the provided subscription key
+        var speechConfig;
+        if (authorizationToken) {
+          speechConfig = SpeechSDK.SpeechConfig.fromAuthorizationToken(authorizationToken, serviceRegion.value);
+        } else {
+          if (subscriptionKey.value === "" || subscriptionKey.value === "subscription") {
+            alert("Please enter your Microsoft Cognitive Services Speech subscription key!");
+            return;
+          }
+          speechConfig = SpeechSDK.SpeechConfig.fromSubscription(subscriptionKey.value, serviceRegion.value);
+        }
+
+        speechConfig.speechRecognitionLanguage = "en-US";
+        var audioConfig  = SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
+        recognizer = new SpeechSDK.SpeechRecognizer(speechConfig, audioConfig);
+
+        recognizer.recognizeOnceAsync(
+          function (result) {
+            startRecognizeOnceAsyncButton.disabled = false;
+            phraseDiv.innerHTML += result.text;
+            window.console.log(result);
+
+            recognizer.close();
+            recognizer = undefined;
+          },
+          function (err) {
+            startRecognizeOnceAsyncButton.disabled = false;
+            phraseDiv.innerHTML += err;
+            window.console.log(err);
+
+            recognizer.close();
+            recognizer = undefined;
+          });
+      });
+
+      if (!!window.SpeechSDK) {
+        SpeechSDK = window.SpeechSDK;
+        startRecognizeOnceAsyncButton.disabled = false;
+
+        document.getElementById('content').style.display = 'block';
+        document.getElementById('warning').style.display = 'none';
+
+        // in case we have a function for getting an authorization token, call it.
+        if (typeof RequestAuthorizationToken === "function") {
+            RequestAuthorizationToken();
+        }
+      }
+
+    });
+  </script>
+  <!-- </quickstartcode> -->
+<script>
+ document.getElementById("starttxtanalytics").addEventListener("click", analyze);
+
+function analyze() {
+//	keyPhrases();
+//	language();
+	sentiment();
+}
+
+function language() {
+	var reqBody = {
+		documents: [{
+			language: "en",
+			id: 1,
+			text: document.getElementById("phraseDiv").value
+		}]
+	};
+
+	var myHeader = new Headers({
+		"Content-Type": "application/json",
+		"Ocp-Apim-Subscription-Key": "9780a035f7ab487aafda62e64acdd919"
+	});
+
+	var initObject = {
+		method: "POST",
+		body: JSON.stringify(reqBody),
+		headers: myHeader
+	};
+
+	var request = new Request("https://eastus.api.cognitive.microsoft.com/text/analytics/v2.1/languages?",
+		initObject
+	);
+
+	fetch(request)
+		.then(function (response) {
+			if (response.ok) {
+				return response.json();
+			} else {
+				return Promise.reject(new Error(response.statusText));
+			}
+		})
+		.then(function (response) {
+			document.getElementById("language").innerHTML =
+				"<h5>" + response.documents[0].detectedLanguages[0].name + "</h5>";
+		})
+		.catch(function (err) {
+			alert(err);
+			document.getElementById("output").innerHTML = "";
+		});
+}
+
+function keyPhrases() {
+	var reqBody = {
+		documents: [{
+			language: "en",
+			id: 1,
+			text: document.getElementById("phraseDiv").value
+		}]
+	};
+
+	var myHeader = new Headers({
+		"Content-Type": "application/json",
+		"Ocp-Apim-Subscription-Key": "9780a035f7ab487aafda62e64acdd919"
+	});
+
+	var initObject = {
+		method: "POST",
+		body: JSON.stringify(reqBody),
+		headers: myHeader
+	};
+
+	var request = new Request("https://eastus.api.cognitive.microsoft.com/text/analytics/v2.1/keyPhrases",
+		initObject
+	);
+
+	fetch(request)
+		.then(function (response) {
+			if (response.ok) {
+				return response.json();
+			} else {
+				return Promise.reject(new Error(response.statusText));
+			}
+		})
+		.then(function (response) {
+			document.getElementById("keyPhrases").innerHTML =
+				"<h5>" +
+				response.documents[0].keyPhrases.length +
+				"</h5>" +
+				"</br>" +
+				response.documents[0].keyPhrases;
+		})
+		.catch(function (err) {
+			alert(err);
+			document.getElementById("output").innerHTML = "";
+		});
+}
+
+function sentiment() {
+	var reqBody = {
+		documents: [{
+			language: "en",
+			id: 1,
+			text: document.getElementById("phraseDiv").value
+		}]
+	};
+
+	var myHeader = new Headers({
+		"Content-Type": "application/json",
+		"Ocp-Apim-Subscription-Key": "9780a035f7ab487aafda62e64acdd919" 
+		
+	});
+//document.getElementById("txtsubscriptionKey").value
+	var initObject = {
+		method: "POST",
+		body: JSON.stringify(reqBody),
+		headers: myHeader
+	};
+	var enpt = document.getElementById("txtsubscriptionKey").value;
+	var request = new Request("https://eastus.api.cognitive.microsoft.com/text/analytics/v2.1/sentiment?",
+		initObject
+	);
+//
+	fetch(request)
+		.then(function (response) {
+			if (response.ok) {
+				return response.json();
+			} else {
+				return Promise.reject(new Error(response.statusText));
+			}
+		})
+		.then(function (response) {
+			var sentiment = response.documents[0].score;
+			document.getElementById("sentDiv").innerHTML = sentiment
+		})
+		.catch(function (err) {
+			alert(err);
+			document.getElementById("sentDiv").innerHTML = "Error";
+		});
+}
+
+ </script>
+</body>
+</html>
