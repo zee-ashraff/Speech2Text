@@ -10,8 +10,8 @@
 	function sentimentAnalysis(){
 		const { TextAnalyticsClient, TextAnalyticsApiKeyCredential } = require("@azure/ai-text-analytics");
 
-		const key = 'e4057ba6db8f471ea1b4588ed92f476b';
-		const endpoint = 'https://s2tanalytics.cognitiveservices.azure.com/';
+		const key = 'e6ce0febb1144462a8728e5c309b1cb8';
+		const endpoint = 'https://traintxtanalytics.cognitiveservices.azure.com/';
 
 		const textAnalyticsClient = new TextAnalyticsClient(endpoint,  new TextAnalyticsApiKeyCredential(key));
 		alert('test the sentiment');
