@@ -31,5 +31,5 @@ jobs:
       with:
         app-name: 'trainwebapp30'
         slot-name: 'production'
-        publish-profile: ${{ secrets.AzureAppService_PublishProfile_9fa55f1e75de488b973a1b97898f8823 }}
+        publish-profile: ${{ secrets.AzureAppService_PublishProfile_82e7d51b0fd246c3b0693fb2202bf3cb }}
         package: ${{env.DOTNET_ROOT}}/myapp 
